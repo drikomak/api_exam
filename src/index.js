@@ -6,42 +6,76 @@ const fastify = Fastify({
   logger: true,
 })
 
-const recipeStorage = {} // stockage en mémoire des recettes
-const allowedCities = ['paris', 'lyon', 'marseille'] // mock des villes existantes
+// Pre-populated database of cities
+const citiesDatabase = {
+  'pixelton': {
+    id: 'pixelton',
+    name: 'Pixelton',
+    coordinates: {
+      latitude: 51.5074,
+      longitude: -0.1278
+    },
+    population: 256000,
+    country: 'Graphica',
+    knownFor: ['Pixel Art Gallery', 'Raster Road'],
+    weather: [
+      { when: 'today', min: 5, max: 15 },
+      { when: 'tomorrow', min: 6, max: 16 }
+    ],
+    recipes: [
+      {
+        id: 'pixel-pancakes',
+        content: 'Mix 1 cup flour, 1 tbsp sugar, 1 tsp baking powder, and 1/2 tsp salt. Add 1 egg, 1 cup milk, and 2 tbsp melted butter. Cook on a griddle, flipping when pixels form. Stack and serve with syrup!'
+      },
+      {
+        id: 'raster-ravioli',
+        content: 'Mix 2 cups flour, 3 eggs, and a pinch of salt. Roll into sheets, fill with ricotta and spinach. Cut into squares, boil until al dente. Serve with pixelated pesto sauce.'
+      }
+    ]
+  }
+}
+
+// Store recipes separately but initialize with the ones from citiesDatabase
+const recipeStorage = Object.entries(citiesDatabase).reduce((acc, [cityId, city]) => {
+  acc[cityId] = [...city.recipes]
+  return acc
+}, {})
 
 function generateId() {
-  return Math.floor(Math.random() * 1000000)
+  return Math.floor(Math.random() * 1000000).toString()
 }
 
 fastify.get('/cities/:cityId/infos', async (request, reply) => {
   const { cityId } = request.params
+  const city = citiesDatabase[cityId]
 
-  if (!allowedCities.includes(cityId)) {
+  if (!city) {
     return reply.status(404).send({ error: 'City not found' })
   }
 
-  reply.send({
-    coordinates: [48.8566, 2.3522],
-    population: 2148000,
-    knownFor: ['gastronomy', 'architecture'],
-    weatherPredictions: [
-      { when: 'today', min: 10, max: 20 },
-      { when: 'tomorrow', min: 12, max: 22 }
-    ],
+  return {
+    coordinates: [city.coordinates.longitude, city.coordinates.latitude],
+    population: city.population,
+    knownFor: city.knownFor,
+    weatherPredictions: city.weather,
     recipes: recipeStorage[cityId] || []
-  })
+  }
 })
 
 fastify.post('/cities/:cityId/recipes', async (request, reply) => {
   const { cityId } = request.params
   const { content } = request.body
 
-  if (!allowedCities.includes(cityId)) {
-    return reply.status(404).send({ error: 'City not found' })
+  if (!content || typeof content !== 'string') {
+    return reply.status(400).send({ error: 'Content is required and must be a string' })
   }
 
-  if (!content || typeof content !== 'string' || content.length < 10 || content.length > 2000) {
-    return reply.status(400).send({ error: 'Invalid content length' })
+  if (content.length < 10 || content.length > 2000) {
+    return reply.status(400).send({ error: 'Content length must be between 10 and 2000 characters' })
+  }
+
+  if (!citiesDatabase[cityId]) {
+    return reply.status(404).send({ error: 'City not found' })
   }
 
   const newRecipe = { id: generateId(), content }
@@ -54,15 +88,19 @@ fastify.post('/cities/:cityId/recipes', async (request, reply) => {
 fastify.delete('/cities/:cityId/recipes/:recipeId', async (request, reply) => {
   const { cityId, recipeId } = request.params
 
-  if (!allowedCities.includes(cityId)) {
+  if (!citiesDatabase[cityId]) {
     return reply.status(404).send({ error: 'City not found' })
   }
 
   const recipes = recipeStorage[cityId]
-  if (!recipes) return reply.status(404).send({ error: 'Recipe not found' })
+  if (!recipes) {
+    return reply.status(404).send({ error: 'Recipe not found' })
+  }
 
-  const index = recipes.findIndex(r => r.id == recipeId)
-  if (index === -1) return reply.status(404).send({ error: 'Recipe not found' })
+  const index = recipes.findIndex(r => r.id === recipeId)
+  if (index === -1) {
+    return reply.status(404).send({ error: 'Recipe not found' })
+  }
 
   recipes.splice(index, 1)
   reply.status(204).send()
