@@ -65,36 +65,26 @@ function generateId() {
 fastify.get('/cities/:cityId/infos', async (request, reply) => {
   try {
     const { cityId } = request.params
-    const apiKey = process.env.API_KEY
-    const baseUrl = 'https://api-ugi2pflmha-ew.a.run.app'
+    const city = citiesDatabase[cityId]
 
-    // Fetch city data
-    const cityRes = await fetch(`${baseUrl}/cities/${cityId}/insights?apiKey=${apiKey}`)
-    if (!cityRes.ok) {
+    if (!city) {
       return reply.status(404).send({ error: 'City not found' })
     }
-    const city = await cityRes.json()
 
-    // Fetch weather data
-    const weatherRes = await fetch(`${baseUrl}/weather-predictions?cityIdentifier=${cityId}&apiKey=${apiKey}`)
-    if (!weatherRes.ok) {
-      return reply.status(500).send({ error: 'Weather API error' })
-    }
-    const weatherData = await weatherRes.json()
-
-    // Format the response
     return {
-      coordinates: [{
-        latitude: city.coordinates[0].latitude,
-        longitude: city.coordinates[0].longitude
-      }],
+      // Format coordinates as [lat, lon] array
+      coordinates: [city.coordinates[0].latitude, city.coordinates[0].longitude],
+      // Population as is
       population: city.population,
-      knownFor: Array.isArray(city.knownFor) ? city.knownFor : [],
-      weatherPredictions: weatherData[0]?.predictions?.slice(0, 2).map((w, i) => ({
-        minTemperature: w.minTemperature,
-        maxTemperature: w.maxTemperature,
-        date: i === 0 ? 'today' : 'tomorrow'
-      })) || [],
+      // Map knownFor to array of strings (just the content)
+      knownFor: city.knownFor.map(item => item.content),
+      // Format weather predictions with when, min, max
+      weatherPredictions: city.weatherPredictions.map(w => ({
+        when: w.date,
+        min: w.minTemperature,
+        max: w.maxTemperature
+      })),
+      // Recipes array from storage
       recipes: recipeStorage[cityId] || []
     }
   } catch (error) {
