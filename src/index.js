@@ -11,16 +11,33 @@ const citiesDatabase = {
   'pixelton': {
     id: 'pixelton',
     name: 'Pixelton',
-    coordinates: {
+    coordinates: [{
       latitude: 51.5074,
       longitude: -0.1278
-    },
+    }],
     population: 256000,
     country: 'Graphica',
-    knownFor: ['Pixel Art Gallery', 'Raster Road'],
-    weather: [
-      { when: 'today', min: 5, max: 15 },
-      { when: 'tomorrow', min: 6, max: 16 }
+    knownFor: [
+      {
+        format: 'attraction',
+        content: 'Pixel Art Gallery'
+      },
+      {
+        format: 'landmark',
+        content: 'Raster Road'
+      }
+    ],
+    weatherPredictions: [
+      {
+        minTemperature: 5,
+        maxTemperature: 15,
+        date: 'today'
+      },
+      {
+        minTemperature: 6,
+        maxTemperature: 16,
+        date: 'tomorrow'
+      }
     ],
     recipes: [
       {
@@ -46,19 +63,24 @@ function generateId() {
 }
 
 fastify.get('/cities/:cityId/infos', async (request, reply) => {
-  const { cityId } = request.params
-  const city = citiesDatabase[cityId]
+  try {
+    const { cityId } = request.params
+    const city = citiesDatabase[cityId]
 
-  if (!city) {
-    return reply.status(404).send({ error: 'City not found' })
-  }
+    if (!city) {
+      return reply.status(404).send({ error: 'City not found' })
+    }
 
-  return {
-    coordinates: [city.coordinates.longitude, city.coordinates.latitude],
-    population: city.population,
-    knownFor: city.knownFor,
-    weatherPredictions: city.weather,
-    recipes: recipeStorage[cityId] || []
+    return {
+      coordinates: city.coordinates,
+      population: city.population,
+      knownFor: city.knownFor,
+      weatherPredictions: city.weatherPredictions,
+      recipes: recipeStorage[cityId] || []
+    }
+  } catch (error) {
+    fastify.log.error(error)
+    return reply.status(500).send({ error: 'Internal server error' })
   }
 })
 
@@ -86,24 +108,29 @@ fastify.post('/cities/:cityId/recipes', async (request, reply) => {
 })
 
 fastify.delete('/cities/:cityId/recipes/:recipeId', async (request, reply) => {
-  const { cityId, recipeId } = request.params
+  try {
+    const { cityId, recipeId } = request.params
 
-  if (!citiesDatabase[cityId]) {
-    return reply.status(404).send({ error: 'City not found' })
+    if (!citiesDatabase[cityId]) {
+      return reply.status(404).send({ error: 'City not found' })
+    }
+
+    const recipes = recipeStorage[cityId]
+    if (!recipes) {
+      return reply.status(404).send({ error: 'Recipe not found' })
+    }
+
+    const index = recipes.findIndex(r => r.id === recipeId)
+    if (index === -1) {
+      return reply.status(404).send({ error: 'Recipe not found' })
+    }
+
+    recipes.splice(index, 1)
+    return reply.status(204).send()
+  } catch (error) {
+    fastify.log.error(error)
+    return reply.status(500).send({ error: 'Internal server error' })
   }
-
-  const recipes = recipeStorage[cityId]
-  if (!recipes) {
-    return reply.status(404).send({ error: 'Recipe not found' })
-  }
-
-  const index = recipes.findIndex(r => r.id === recipeId)
-  if (index === -1) {
-    return reply.status(404).send({ error: 'Recipe not found' })
-  }
-
-  recipes.splice(index, 1)
-  reply.status(204).send()
 })
 
 fastify.listen(
