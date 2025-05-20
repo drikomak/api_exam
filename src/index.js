@@ -7,28 +7,38 @@ const fastify = Fastify({
 })
 
 const recipeStorage = {} // stockage en mémoire des recettes
+const allowedCities = ['paris', 'lyon', 'marseille'] // mock des villes existantes
 
 function generateId() {
   return Math.floor(Math.random() * 1000000)
 }
 
 fastify.get('/cities/:cityId/infos', async (request, reply) => {
-  // Placeholder (à remplacer avec axios + API externe)
+  const { cityId } = request.params
+
+  if (!allowedCities.includes(cityId)) {
+    return reply.status(404).send({ error: 'City not found' })
+  }
+
   reply.send({
-    coordinates: [0, 0],
-    population: 100000,
-    knownFor: ['example'],
+    coordinates: [48.8566, 2.3522],
+    population: 2148000,
+    knownFor: ['gastronomy', 'architecture'],
     weatherPredictions: [
       { when: 'today', min: 10, max: 20 },
-      { when: 'tomorrow', min: 11, max: 21 }
+      { when: 'tomorrow', min: 12, max: 22 }
     ],
-    recipes: recipeStorage[request.params.cityId] || []
+    recipes: recipeStorage[cityId] || []
   })
 })
 
 fastify.post('/cities/:cityId/recipes', async (request, reply) => {
   const { cityId } = request.params
   const { content } = request.body
+
+  if (!allowedCities.includes(cityId)) {
+    return reply.status(404).send({ error: 'City not found' })
+  }
 
   if (!content || typeof content !== 'string' || content.length < 10 || content.length > 2000) {
     return reply.status(400).send({ error: 'Invalid content length' })
@@ -43,8 +53,12 @@ fastify.post('/cities/:cityId/recipes', async (request, reply) => {
 
 fastify.delete('/cities/:cityId/recipes/:recipeId', async (request, reply) => {
   const { cityId, recipeId } = request.params
-  const recipes = recipeStorage[cityId]
 
+  if (!allowedCities.includes(cityId)) {
+    return reply.status(404).send({ error: 'City not found' })
+  }
+
+  const recipes = recipeStorage[cityId]
   if (!recipes) return reply.status(404).send({ error: 'Recipe not found' })
 
   const index = recipes.findIndex(r => r.id == recipeId)
